@@ -1,10 +1,12 @@
 ﻿using TaskApp.Api.DTOS;
+using TaskApp.Domain.Entities;
 
 namespace TaskApp.Api.Services
 {
     public interface ITaskService
     {
-       IEnumerable<TaskDto> GetAll();
+        Task<IEnumerable<TaskItem>> GetAllAsync();
+        Task<TaskItem> CreateAsync(TaskItem task);
     }
 
 }

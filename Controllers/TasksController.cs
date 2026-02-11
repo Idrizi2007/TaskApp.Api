@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TaskApp.Api.Services;
+using TaskApp.Domain.Entities;
 
 namespace TaskApp.Api.Controllers
 {
@@ -8,18 +9,24 @@ namespace TaskApp.Api.Controllers
     public class TasksController : ControllerBase
     {
         private readonly ITaskService _taskservice;
-        public TasksController(ITaskService Service)
-        {
-            _taskservice = Service;
 
+        public TasksController(ITaskService service)
+        {
+            _taskservice = service;
         }
+
         [HttpGet]
-
-
-        public IActionResult GetAll()
+        public async Task<IActionResult> GetAll()
         {
-            return Ok(_taskservice.GetAll());
+            var tasks = await _taskservice.GetAllAsync();
+            return Ok(tasks);
+        }
 
+        [HttpPost]
+        public async Task<IActionResult> Create(TaskItem task)
+        {
+            var created = await _taskservice.CreateAsync(task);
+            return Ok(created);
         }
     }
 }

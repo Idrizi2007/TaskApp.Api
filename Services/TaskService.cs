@@ -1,35 +1,30 @@
-﻿using TaskApp.Api.DTOS;
+﻿using Microsoft.EntityFrameworkCore;
+using TaskApp.Api.Infrastructure.Persistence;
+using TaskApp.Domain.Entities;
+using TaskApp.Api.Infrastructure.Persistence;
+
 
 namespace TaskApp.Api.Services
 {
     public class TaskService : ITaskService
     {
-        private readonly List<TaskDto> _tasks = new()
-        {
-            new TaskDto
-            {
-                Id = 1,
-                Title = "First Task",
-                IsCompleted = false,
-                DueDate = DateTime.UtcNow.AddDays(1)
-            },
-            new TaskDto
-            {
-                Id = 2,
-                Title = "Second Task",
-                IsCompleted = true,
-                DueDate = DateTime.UtcNow.AddDays(-1)
-            },
-            
-        };
+        private readonly AppDbContext _context;
 
-        public IEnumerable<TaskDto> GetAll()
+        public TaskService(AppDbContext context)
         {
-            return _tasks;
+            _context = context;
         }
-        
 
+        public async Task<IEnumerable<TaskItem>> GetAllAsync()
+        {
+            return await _context.Tasks.ToListAsync();
+        }
+
+        public async Task<TaskItem> CreateAsync(TaskItem task)
+        {
+            _context.Tasks.Add(task);
+            await _context.SaveChangesAsync();
+            return task;
+        }
     }
-
 }
-
