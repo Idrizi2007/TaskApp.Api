@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using TaskApp.Api.DTOS;
+using TaskApp.Api.DTOS;
 using TaskApp.Api.Services;
-using TaskApp.Domain.Entities;
 
 namespace TaskApp.Api.Controllers
 {
@@ -23,9 +24,9 @@ namespace TaskApp.Api.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create(TaskItem task)
+        public async Task<IActionResult> Create(CreateTaskDto dto)
         {
-            var created = await _taskservice.CreateAsync(task);
+            var created = await _taskservice.CreateAsync(dto);
             return Ok(created);
         }
     }
