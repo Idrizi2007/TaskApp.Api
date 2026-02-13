@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TaskApp.Api.DTOS;
-using TaskApp.Api.DTOS;
 using TaskApp.Api.Services;
 
 namespace TaskApp.Api.Controllers
@@ -9,24 +8,26 @@ namespace TaskApp.Api.Controllers
     [Route("tasks")]
     public class TasksController : ControllerBase
     {
-        private readonly ITaskService _taskservice;
+        private readonly ITaskService _taskService;
 
-        public TasksController(ITaskService service)
+        public TasksController(ITaskService taskService)
         {
-            _taskservice = service;
+            _taskService = taskService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var tasks = await _taskservice.GetAllAsync();
+            var tasks = await _taskService.GetAllAsync(page, pageSize);
             return Ok(tasks);
         }
 
         [HttpPost]
         public async Task<IActionResult> Create(CreateTaskDto dto)
         {
-            var created = await _taskservice.CreateAsync(dto);
+            var created = await _taskService.CreateAsync(dto);
             return Ok(created);
         }
     }

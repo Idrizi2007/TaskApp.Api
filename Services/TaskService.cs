@@ -2,6 +2,7 @@
 using TaskApp.Api.DTOS;
 using TaskApp.Api.Infrastructure.Persistence;
 using TaskApp.Domain.Entities;
+using TaskApp.Api.Exceptions;
 
 namespace TaskApp.Api.Services
 {
@@ -14,13 +15,21 @@ namespace TaskApp.Api.Services
             _context = context;
         }
 
-       
         public async Task<IEnumerable<TaskItem>> GetAllAsync()
         {
             return await _context.Tasks.ToListAsync();
         }
 
-        // CREATE — uses DTO, creates domain entity INSIDE service
+        public async Task<TaskItem> GetByIdAsync(int id)
+        {
+            var task = await _context.Tasks.FindAsync(id);
+
+            if (task is null)
+                throw new NotFoundException($"Task with id '{id}' was not found.");
+
+            return task;
+        }
+
         public async Task<TaskDto> CreateAsync(CreateTaskDto dto)
         {
             var task = new TaskItem(dto.Title, dto.Description);
@@ -38,16 +47,29 @@ namespace TaskApp.Api.Services
             };
         }
 
-        public async Task<bool> CompleteAsync(int id)
+        public async Task CompleteAsync(int id)
         {
             var task = await _context.Tasks.FindAsync(id);
-            if (task == null)
-                return false;
+
+            if (task is null)
+                throw new NotFoundException($"Task with id '{id}' was not found.");
 
             task.Complete();
 
             await _context.SaveChangesAsync();
-            return true;
         }
+
+        public async Task<IEnumerable<TaskItem>> GetAllAsync(int page, int pageSize)
+        {
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize is < 1 or > 50 ? 10 : pageSize;
+
+            return await _context.Tasks
+                .OrderByDescending(t => t.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+
     }
 }
