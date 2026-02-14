@@ -1,8 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TaskApp.Api.DTOS;
-using TaskApp.Api.Infrastructure.Persistence;
-using TaskApp.Domain.Entities;
 using TaskApp.Api.Exceptions;
+using TaskApp.Api.Infrastructure.Persistence;
+using TaskApp.Api.Domain.Entities;
+
+
+
 
 namespace TaskApp.Api.Services
 {
@@ -15,24 +18,32 @@ namespace TaskApp.Api.Services
             _context = context;
         }
 
-        public async Task<IEnumerable<TaskItem>> GetAllAsync()
+        public async Task<IEnumerable<TaskItem>> GetAllAsync(
+            Guid userId,
+            int page,
+            int pageSize)
         {
-            return await _context.Tasks.ToListAsync();
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize is < 1 or > 50 ? 10 : pageSize;
+
+            return await _context.Tasks
+                .Where(t => t.UserId == userId)
+                .OrderByDescending(t => t.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
         }
 
-        public async Task<TaskItem> GetByIdAsync(int id)
+        public async Task<TaskItem> GetByIdAsync(int id, Guid userId)
         {
-            var task = await _context.Tasks.FindAsync(id);
-
-            if (task is null)
-                throw new NotFoundException($"Task with id '{id}' was not found.");
-
-            return task;
+            return await _context.Tasks
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId)
+                ?? throw new NotFoundException($"Task with id '{id}' was not found.");
         }
 
-        public async Task<TaskDto> CreateAsync(CreateTaskDto dto)
+        public async Task<TaskDto> CreateAsync(CreateTaskDto dto, Guid userId)
         {
-            var task = new TaskItem(dto.Title, dto.Description);
+            var task = new TaskItem(dto.Title, dto.Description, userId);
 
             _context.Tasks.Add(task);
             await _context.SaveChangesAsync();
@@ -47,29 +58,14 @@ namespace TaskApp.Api.Services
             };
         }
 
-        public async Task CompleteAsync(int id)
+        public async Task CompleteAsync(int id, Guid userId)
         {
-            var task = await _context.Tasks.FindAsync(id);
-
-            if (task is null)
-                throw new NotFoundException($"Task with id '{id}' was not found.");
+            var task = await _context.Tasks
+                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId)
+                ?? throw new NotFoundException($"Task with id '{id}' was not found.");
 
             task.Complete();
-
             await _context.SaveChangesAsync();
         }
-
-        public async Task<IEnumerable<TaskItem>> GetAllAsync(int page, int pageSize)
-        {
-            page = page < 1 ? 1 : page;
-            pageSize = pageSize is < 1 or > 50 ? 10 : pageSize;
-
-            return await _context.Tasks
-                .OrderByDescending(t => t.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-        }
-
     }
 }
