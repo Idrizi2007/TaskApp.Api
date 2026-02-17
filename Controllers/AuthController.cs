@@ -1,6 +1,9 @@
 ﻿using Contracts.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskApp.Api.Services;
+using TaskApp.Api.Common;
+
 
 namespace TaskApp.Api.Controllers
 {
@@ -27,6 +30,22 @@ namespace TaskApp.Api.Controllers
         {
             var response = await _authService.LoginAsync(request);
             return Ok(response);
+        }
+
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh(RefreshRequest request)
+        {
+            var response = await _authService.RefreshAsync(request);
+            return Ok(response);
+        }
+
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<IActionResult> Logout()
+        {
+            var userId = User.GetUserId();
+            await _authService.LogoutAsync(userId);
+            return NoContent();
         }
     }
 }

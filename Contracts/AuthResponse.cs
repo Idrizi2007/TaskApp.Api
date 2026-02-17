@@ -1,3 +1,13 @@
 ﻿namespace Contracts.Auth;
 
-public record AuthResponse(string Token);
+public class AuthResponse
+{
+    public string AccessToken { get; }
+    public string? RefreshToken { get; }
+
+    public AuthResponse(string accessToken, string? refreshToken)
+    {
+        AccessToken = accessToken;
+        RefreshToken = refreshToken;
+    }
+}

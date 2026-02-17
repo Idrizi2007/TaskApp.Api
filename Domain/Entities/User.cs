@@ -6,7 +6,10 @@
         public string Email { get; private set; }
         public string PasswordHash { get; private set; }
 
-        private User() { }
+        // Refresh token (owned entity)
+        public RefreshToken? RefreshToken { get; private set; }
+
+        private User() { } // EF Core
 
         public User(string email, string passwordHash)
         {
@@ -14,6 +17,10 @@
             Email = email;
             PasswordHash = passwordHash;
         }
-    }
 
+        public void SetRefreshToken(RefreshToken refreshToken)
+        {
+            RefreshToken = refreshToken;
+        }
+    }
 }
