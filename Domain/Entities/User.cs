@@ -6,16 +6,18 @@
         public string Email { get; private set; }
         public string PasswordHash { get; private set; }
 
-        // Refresh token (owned entity)
+        public UserRole Role { get; private set; } = UserRole.User;
+
         public RefreshToken? RefreshToken { get; private set; }
 
         private User() { } // EF Core
 
-        public User(string email, string passwordHash)
+        public User(string email, string passwordHash, UserRole role = UserRole.User)
         {
             Id = Guid.NewGuid();
             Email = email;
             PasswordHash = passwordHash;
+            Role = role;
         }
 
         public void SetRefreshToken(RefreshToken refreshToken)

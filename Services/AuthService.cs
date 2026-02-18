@@ -32,15 +32,22 @@ namespace TaskApp.Api.Services
             if (await _context.Users.AnyAsync(u => u.Email == request.Email))
                 throw new Exception("Email already exists");
 
-            var user = new User(request.Email, string.Empty);
+            var hashedPassword =
+                _passwordHasher.HashPassword(null!, request.Password);
 
-            var hashedPassword = _passwordHasher.HashPassword(user, request.Password);
-            user = new User(request.Email, hashedPassword);
+            var user = new User(
+                request.Email,
+                hashedPassword,
+                UserRole.User
+            );
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return new AuthResponse(GenerateToken(user), null);
+            return new AuthResponse(
+                GenerateToken(user),
+                null
+            );
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request)
@@ -130,7 +137,8 @@ namespace TaskApp.Api.Services
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Email, user.Email)
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role.ToString())
             };
 
             var key = new SymmetricSecurityKey(
