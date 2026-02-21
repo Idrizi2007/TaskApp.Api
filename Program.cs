@@ -1,9 +1,9 @@
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
 using TaskApp.Api.Domain.Entities;
@@ -14,10 +14,7 @@ using TaskApp.Api.Validation;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ---- LOGGING (optional) ----
-Console.WriteLine("ENV = " + builder.Environment.EnvironmentName);
-Console.WriteLine("BASE PATH = " + builder.Environment.ContentRootPath);
-Console.WriteLine("CS = " + builder.Configuration.GetConnectionString("DefaultConnection"));
+// -------------------- SERVICES --------------------
 
 builder.Services.AddControllers();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTaskDtoValidator>();
@@ -25,29 +22,27 @@ builder.Services.AddFluentValidationAutoValidation();
 
 builder.Services.AddScoped<ITaskService, TaskService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
-// ---- DATABASE ----
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-{
-    throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection");
-}
+// -------------------- DATABASE --------------------
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("Missing ConnectionStrings:DefaultConnection");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(connectionString)
 );
 
-// ---- JWT AUTH (ROLE-AWARE) ----
-var jwtKey = builder.Configuration["Jwt:Key"];
-if (string.IsNullOrWhiteSpace(jwtKey))
-{
-    throw new InvalidOperationException("Missing Jwt:Key");
-}
+// -------------------- JWT AUTH --------------------
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Missing Jwt:Key");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        options.IncludeErrorDetails = true;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -63,20 +58,72 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ),
 
             NameClaimType = ClaimTypes.NameIdentifier,
-            RoleClaimType = ClaimTypes.Role
+            RoleClaimType = ClaimTypes.Role,
+
+            ClockSkew = TimeSpan.FromMinutes(2)
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = ctx =>
+            {
+                Console.WriteLine("=== JWT AUTH FAILED ===");
+                Console.WriteLine(ctx.Exception.ToString());
+                Console.WriteLine("=======================");
+                return Task.CompletedTask;
+            },
+            OnTokenValidated = ctx =>
+            {
+                Console.WriteLine("=== JWT VALIDATED SUCCESS ===");
+                return Task.CompletedTask;
+            }
         };
     });
 
-// ---- AUTHORIZATION ----
 builder.Services.AddAuthorization();
 
-// ---- SWAGGER ----
+// -------------------- SWAGGER --------------------
+
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "TaskApp API",
+        Version = "v1"
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter: Bearer {your JWT token}"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 var app = builder.Build();
 
-// ---- PIPELINE ----
+// -------------------- PIPELINE --------------------
+
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
@@ -88,30 +135,16 @@ else
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 }
 
-app.UseHttpsRedirection();
+// Log incoming Authorization header
+app.Use(async (context, next) =>
+{
+    Console.WriteLine("AUTH HEADER RECEIVED: " + context.Request.Headers["Authorization"]);
+    await next();
+});
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-
-
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>();
-
-    if (!context.Users.Any(u => u.Role == UserRole.Admin))
-    {
-        var admin = new User(
-            "admin@local",
-            passwordHasher.HashPassword(null!, "Admin123!"),
-            UserRole.Admin
-        );
-
-        context.Users.Add(admin);
-        context.SaveChanges();
-    }
-}
 
 app.Run();

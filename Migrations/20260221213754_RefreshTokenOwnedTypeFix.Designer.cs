@@ -12,8 +12,8 @@ using TaskApp.Api.Infrastructure.Persistence;
 namespace TaskApp.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260217204137_AddUserRole")]
-    partial class AddUserRole
+    [Migration("20260221213754_RefreshTokenOwnedTypeFix")]
+    partial class RefreshTokenOwnedTypeFix
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -38,6 +38,9 @@ namespace TaskApp.Api.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("Role")
+                        .HasColumnType("int");
 
                     b.HasKey("Id");
 

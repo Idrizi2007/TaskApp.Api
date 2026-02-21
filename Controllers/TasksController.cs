@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using TaskApp.Api.Domain.Entities;
 using TaskApp.Api.DTOS;
-using TaskApp.Api.Services;
 
 [ApiController]
 [Route("tasks")]
@@ -19,9 +17,26 @@ public class TasksController : ControllerBase
 
     private Guid GetUserId()
     {
-        return Guid.Parse(
-            User.FindFirst(ClaimTypes.NameIdentifier)!.Value
-        );
+        return Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    }
+
+    private bool IsAdmin()
+    {
+        return User.IsInRole("Admin");
+    }
+
+    // 🔎 DEBUG ENDPOINT
+    [HttpGet("debug")]
+    public IActionResult Debug()
+    {
+        var authHeader = Request.Headers["Authorization"].ToString();
+
+        return Ok(new
+        {
+            AuthorizationHeader = authHeader,
+            UserAuthenticated = User.Identity?.IsAuthenticated,
+            Claims = User.Claims.Select(c => new { c.Type, c.Value })
+        });
     }
 
     [HttpGet]
@@ -30,8 +45,20 @@ public class TasksController : ControllerBase
         [FromQuery] int pageSize = 10)
     {
         var userId = GetUserId();
-        var tasks = await _taskService.GetAllAsync(userId, page, pageSize);
+        var isAdmin = IsAdmin();
+
+        var tasks = await _taskService.GetAllAsync(userId, isAdmin, page, pageSize);
         return Ok(tasks);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var userId = GetUserId();
+        var isAdmin = IsAdmin();
+
+        var task = await _taskService.GetByIdAsync(id, userId, isAdmin);
+        return Ok(task);
     }
 
     [HttpPost]
@@ -40,5 +67,15 @@ public class TasksController : ControllerBase
         var userId = GetUserId();
         var created = await _taskService.CreateAsync(dto, userId);
         return Ok(created);
+    }
+
+    [HttpPatch("{id:int}/complete")]
+    public async Task<IActionResult> Complete(int id)
+    {
+        var userId = GetUserId();
+        var isAdmin = IsAdmin();
+
+        await _taskService.CompleteAsync(id, userId, isAdmin);
+        return NoContent();
     }
 }

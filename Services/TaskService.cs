@@ -1,71 +1,79 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using TaskApp.Api.Domain.Entities;
 using TaskApp.Api.DTOS;
 using TaskApp.Api.Exceptions;
 using TaskApp.Api.Infrastructure.Persistence;
-using TaskApp.Api.Domain.Entities;
 
+namespace TaskApp.Api.Services;
 
-
-
-namespace TaskApp.Api.Services
+public class TaskService : ITaskService
 {
-    public class TaskService : ITaskService
+    private readonly AppDbContext _context;
+
+    public TaskService(AppDbContext context)
     {
-        private readonly AppDbContext _context;
+        _context = context;
+    }
 
-        public TaskService(AppDbContext context)
+    public async Task<IEnumerable<TaskItem>> GetAllAsync(Guid userId, bool isAdmin, int page, int pageSize)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1) pageSize = 10;
+
+        var query = _context.Tasks.AsQueryable();
+
+        if (!isAdmin)
+            query = query.Where(t => t.UserId == userId);
+
+        return await query
+            .OrderByDescending(t => t.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+    }
+
+    public async Task<TaskItem> GetByIdAsync(int id, Guid userId, bool isAdmin)
+    {
+        var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
+
+        if (task is null)
+            throw new NotFoundException("Task not found.");
+
+        if (!isAdmin && task.UserId != userId)
+            throw new UnauthorizedAccessException("Forbidden.");
+
+        return task;
+    }
+
+    public async Task<TaskDto> CreateAsync(CreateTaskDto dto, Guid userId)
+    {
+        var task = new TaskItem(dto.Title, dto.Description, userId);
+
+        _context.Tasks.Add(task);
+        await _context.SaveChangesAsync();
+
+        // If your TaskDto differs, adjust mapping here
+        return new TaskDto
         {
-            _context = context;
-        }
+            Id = task.Id,
+            Title = task.Title,
+            Description = task.Description,
+            IsCompleted = task.IsCompleted,
+            CreatedAt = task.CreatedAt
+        };
+    }
 
-        public async Task<IEnumerable<TaskItem>> GetAllAsync(
-            Guid userId,
-            int page,
-            int pageSize)
-        {
-            page = page < 1 ? 1 : page;
-            pageSize = pageSize is < 1 or > 50 ? 10 : pageSize;
+    public async Task CompleteAsync(int id, Guid userId, bool isAdmin)
+    {
+        var task = await _context.Tasks.FirstOrDefaultAsync(t => t.Id == id);
 
-            return await _context.Tasks
-                .Where(t => t.UserId == userId)
-                .OrderByDescending(t => t.CreatedAt)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
-        }
+        if (task is null)
+            throw new NotFoundException("Task not found.");
 
-        public async Task<TaskItem> GetByIdAsync(int id, Guid userId)
-        {
-            return await _context.Tasks
-                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId)
-                ?? throw new NotFoundException($"Task with id '{id}' was not found.");
-        }
+        if (!isAdmin && task.UserId != userId)
+            throw new UnauthorizedAccessException("Forbidden.");
 
-        public async Task<TaskDto> CreateAsync(CreateTaskDto dto, Guid userId)
-        {
-            var task = new TaskItem(dto.Title, dto.Description, userId);
-
-            _context.Tasks.Add(task);
-            await _context.SaveChangesAsync();
-
-            return new TaskDto
-            {
-                Id = task.Id,
-                Title = task.Title,
-                Description = task.Description,
-                IsCompleted = task.IsCompleted,
-                CreatedAt = task.CreatedAt
-            };
-        }
-
-        public async Task CompleteAsync(int id, Guid userId)
-        {
-            var task = await _context.Tasks
-                .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId)
-                ?? throw new NotFoundException($"Task with id '{id}' was not found.");
-
-            task.Complete();
-            await _context.SaveChangesAsync();
-        }
+        task.Complete();
+        await _context.SaveChangesAsync();
     }
 }
